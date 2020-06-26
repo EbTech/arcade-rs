@@ -41,12 +41,12 @@ macro_rules! struct_events {
                 }
             }
 
-            pub fn pump(&mut self, renderer: &mut ::sdl2::render::Renderer) {
+            pub fn pump(&mut self, renderer: &mut sdl2::render::WindowCanvas) {
                 self.now = ImmediateEvents::new();
 
                 for event in self.pump.poll_iter() {
                     use sdl2::event::Event::*;
-                    use sdl2::event::WindowEventId::Resized;
+                    use sdl2::event::WindowEvent::Resized;
                     use sdl2::keyboard::Keycode::*;
 
                     match event {
@@ -83,7 +83,9 @@ macro_rules! struct_events {
                             }
                         ),*
                         
-                        Window { win_event_id: Resized, .. } => {
+                        Window { win_event: Resized(w, h), .. } => {
+                            panic!("Decide which of these two lines to use!");
+                            //self.now.resize = Some((w, h));
                             self.now.resize = Some(renderer.output_size().unwrap());
                         },
 

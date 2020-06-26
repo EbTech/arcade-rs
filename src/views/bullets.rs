@@ -1,5 +1,5 @@
-use phi::Phi;
-use phi::data::Rectangle;
+use crate::phi::Phi;
+use crate::phi::data::Rectangle;
 use sdl2::pixels::Color;
 
 const BULLET_SPEED: f64 = 240.0;
@@ -18,7 +18,7 @@ pub trait Bullet {
     /// If the bullet should be destroyed, e.g. because it has left the screen,
     /// then return `None`.
     /// Otherwise, return `Some(update_bullet)`.
-    fn update(self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>>;
+    fn update(self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<dyn Bullet>>;
 
     /// Render the bullet to the screen.
     fn render(&self, phi: &mut Phi);
@@ -30,7 +30,7 @@ pub trait Bullet {
 pub fn spawn_bullets(cannon: CannonType,
                      cannons_x: f64,
                      cannon1_y: f64,
-                     cannon2_y: f64) -> Vec<Box<Bullet>>
+                     cannon2_y: f64) -> Vec<Box<dyn Bullet>>
 {
     match cannon {
         CannonType::RectBullet =>
@@ -101,7 +101,7 @@ pub struct RectBullet {
 }
 
 impl Bullet for RectBullet {
-    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>> {
+    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<dyn Bullet>> {
         let (w, _) = phi.output_size();
         self.rect.x += BULLET_SPEED * dt;
 
@@ -138,7 +138,7 @@ pub struct SineBullet {
 }
 
 impl Bullet for SineBullet {
-    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>> {
+    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<dyn Bullet>> {
         self.total_time += dt;
         self.pos_x += BULLET_SPEED * dt;
 
@@ -181,7 +181,7 @@ pub struct DivergentBullet {
 }
 
 impl Bullet for DivergentBullet {
-    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>> {
+    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<dyn Bullet>> {
         self.total_time += dt;
         self.pos_x += BULLET_SPEED * dt;
 

@@ -1,15 +1,15 @@
-use phi::data::Rectangle;
-use phi::gfx::{CopySprite, Sprite};
-use sdl2::render::Renderer;
+use crate::phi::data::Rectangle;
+use crate::phi::gfx::{CopySprite, Sprite};
+use sdl2::render::WindowCanvas;
 
 #[derive(Clone)]
-pub struct Background {
+pub struct Background<'r> {
     pub pos: f64,
     pub vel: f64,
-    pub sprite: Sprite,
+    pub sprite: Sprite<'r>,
 }
 
-impl Background {
+impl<'r> Background<'r> {
     /// Move the background proportionally to the elapsed time since the last
     /// frame and the background's velocity.
     pub fn update(&mut self, elapsed: f64) {
@@ -24,7 +24,7 @@ impl Background {
 
     /// Render the background at its current position, and as many times as
     /// required to fill the screen.
-    pub fn render(&self, renderer: &mut Renderer) {
+    pub fn render(&self, renderer: &mut WindowCanvas) {
         // We determine the scale ratio of the window to the sprite.
         let size = self.sprite.size();
         let (win_w, win_h) = renderer.output_size().unwrap();
@@ -48,14 +48,14 @@ impl Background {
 }
 
 #[derive(Clone)]
-pub struct BgSet {
-    pub back: Background,
-    pub middle: Background,
-    pub front: Background,
+pub struct BgSet<'r> {
+    pub back: Background<'r>,
+    pub middle: Background<'r>,
+    pub front: Background<'r>,
 }
 
-impl BgSet {
-    pub fn new(renderer: &mut Renderer) -> BgSet {
+impl<'r> BgSet<'r> {
+    pub fn new(renderer: &mut WindowCanvas) -> BgSet<'r> {
         BgSet {
             back: Background {
                 pos: 0.0,

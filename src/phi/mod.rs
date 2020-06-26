@@ -4,11 +4,11 @@ pub mod data;
 pub mod gfx;
 
 use self::gfx::Sprite;
-use sdl2::render::Renderer;
+use sdl2::render::WindowCanvas;
 use sdl2::pixels::Color;
+use sdl2::ttf::Sdl2TtfContext;
 use std::collections::HashMap;
 use std::path::Path;
-use sdl2_ttf::Sdl2TtfContext;
 
 
 struct_events! {
@@ -32,26 +32,26 @@ struct_events! {
 
 /// Bundles the Phi abstractions in a single structure which
 /// can be passed easily between functions.
-pub struct Phi<'window> {
+pub struct Phi<'ttf, 'r> {
     pub events: Events,
-    pub renderer: Renderer<'window>,
+    pub renderer: WindowCanvas,
     
     ttf_context: Sdl2TtfContext,
-    allocated_channels: isize,
-    cached_fonts: HashMap<(&'static str, u16), ::sdl2_ttf::Font>,
+    allocated_channels: i32,
+    cached_fonts: HashMap<(&'static str, u16), sdl2::ttf::Font<'ttf, 'r>>,
 }
 
-impl<'window> Phi<'window> {
-    fn new(events: Events, renderer: Renderer<'window>, ttf_context: Sdl2TtfContext) -> Phi<'window> {
+impl<'ttf, 'r> Phi<'ttf, 'r> {
+    fn new(events: Events, renderer: WindowCanvas, ttf_context: Sdl2TtfContext) -> Phi<'ttf, 'r> {
         // We start with 32 mixer channels, which we may grow if necessary.
         let allocated_channels = 32;
-        ::sdl2_mixer::allocate_channels(allocated_channels);
+        sdl2::mixer::allocate_channels(allocated_channels);
         
         Phi {
-            events: events,
-            renderer: renderer,
-            ttf_context: ttf_context,
-            allocated_channels: allocated_channels,
+            events,
+            renderer,
+            ttf_context,
+            allocated_channels,
             cached_fonts: HashMap::new(),
         }
     }
@@ -67,7 +67,7 @@ impl<'window> Phi<'window> {
         //? case, we use it to render the text.
         if let Some(font) = self.cached_fonts.get(&(font_path, size)) {
             return font.render(text).blended(color).ok()
-                .and_then(|surface| self.renderer.create_texture_from_surface(&surface).ok())
+                .and_then(|surface| self.renderer.texture_creator().create_texture_from_surface(&surface).ok())
                 .map(Sprite::new)
         }
 
@@ -84,14 +84,14 @@ impl<'window> Phi<'window> {
     }
     
     /// Play a sound once, and allocate new channels if this is necessary.
-    pub fn play_sound(&mut self, sound: &::sdl2_mixer::Chunk) {
+    pub fn play_sound(&mut self, sound: &::sdl2::mixer::Chunk) {
         // Attempt to play the sound once.
-        match ::sdl2_mixer::Channel::all().play(sound, 0) {
+        match sdl2::mixer::Channel::all().play(sound, 0) {
             Err(_) => {
                 // If there weren't enough channels allocated, then we double
                 // that number and try again.
                 self.allocated_channels *= 2;
-                ::sdl2_mixer::allocate_channels(self.allocated_channels);
+                sdl2::mixer::allocate_channels(self.allocated_channels);
                 self.play_sound(sound);
                 println!("Allocating {} channels.", self.allocated_channels);
             },
@@ -105,7 +105,7 @@ impl<'window> Phi<'window> {
 /// the game loop. It specifies whether an action should be executed before the
 /// next rendering.
 pub enum ViewAction {
-    Render(Box<View>),
+    Render(Box<dyn View>),
     Quit,
 }
 
@@ -124,17 +124,17 @@ pub trait View {
 }
 
 pub fn spawn<F>(title: &str, init: F)
-where F: Fn(&mut Phi) -> Box<View> {
+where F: Fn(&mut Phi) -> Box<dyn View> {
     // Initialize SDL2
-    let sdl_context = ::sdl2::init().unwrap();
+    let sdl_context = sdl2::init().unwrap();
     let video = sdl_context.video().unwrap();
     let mut timer = sdl_context.timer().unwrap();
-    let _image_context = ::sdl2_image::init(::sdl2_image::INIT_PNG).unwrap();
-    let _ttf_context = ::sdl2_ttf::init().unwrap();
+    let _image_context = sdl2::image::init(sdl2::image::InitFlag::PNG).unwrap();
+    let _ttf_context = sdl2::ttf::init().unwrap();
     
     // Initialize audio plugin
-    let _mixer_context = ::sdl2_mixer::init(::sdl2_mixer::INIT_OGG).unwrap();
-    ::sdl2_mixer::open_audio(44100, ::sdl2_mixer::AUDIO_S16LSB, 2, 1024).unwrap();
+    let _mixer_context = sdl2::mixer::init(sdl2::mixer::InitFlag::OGG).unwrap();
+    sdl2::mixer::open_audio(44100, sdl2::mixer::AUDIO_S16LSB, 2, 1024).unwrap();
     
     // Create the window
     let window = video.window(title, 800, 600)
@@ -144,7 +144,7 @@ where F: Fn(&mut Phi) -> Box<View> {
     // Create the context
     let mut context = Phi::new(
         Events::new(sdl_context.event_pump().unwrap()),
-        window.renderer().accelerated().build().unwrap(),
+        window.into_canvas().accelerated().build().unwrap(),
         _ttf_context);
 
     // Create the default view

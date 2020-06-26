@@ -1,37 +1,37 @@
-use phi::Phi;
-use phi::data::Rectangle;
+use crate::phi::Phi;
+use crate::phi::data::Rectangle;
 use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
-use sdl2::render::{Renderer, Texture};
-use sdl2_image::LoadTexture;
+use sdl2::render::{WindowCanvas, Texture};
+use sdl2::image::LoadTexture;
 
 
 /// Common interface for rendering a graphical component to some given region
 /// of the window.
 pub trait Renderable {
-    fn render(&self, renderer: &mut Renderer, dest: Rectangle);
+    fn render(&self, renderer: &mut WindowCanvas, dest: Rectangle);
 }
 
 pub trait CopySprite<T> {
     fn copy_sprite(&mut self, sprite: &T, dest: Rectangle);
 }
 
-impl<'window, T: Renderable> CopySprite<T> for Renderer<'window> {
+impl<T: Renderable> CopySprite<T> for WindowCanvas {
     fn copy_sprite(&mut self, sprite: &T, dest: Rectangle) {
        sprite.render(self, dest);
    }
 }
 
 #[derive(Clone)]
-pub struct Sprite {
-    tex: Rc<RefCell<Texture>>,
+pub struct Sprite<'r> {
+    tex: Rc<RefCell<Texture<'r>>>,
     src: Rectangle,
 }
 
-impl Sprite {
+impl<'r> Sprite<'r> {
     /// Creates a new sprite by wrapping a `Texture`.
-    pub fn new(texture: Texture) -> Sprite {
+    pub fn new(texture: Texture) -> Sprite<'r> {
         let tex_query = texture.query();
 
         Sprite {
@@ -47,8 +47,8 @@ impl Sprite {
 
     /// Creates a new sprite from an image file located at the given path.
     /// Returns `Some` if the file could be read, and `None` otherwise.
-    pub fn load(renderer: &Renderer, path: &str) -> Option<Sprite> {
-        renderer.load_texture(Path::new(path)).ok().map(Sprite::new)
+    pub fn load(renderer: &WindowCanvas, path: &str) -> Option<Sprite<'r>> {
+        renderer.texture_creator().load_texture(Path::new(path)).ok().map(Sprite::new)
     }
     
     /// Returns a new `Sprite` representing a sub-region of the current one.
@@ -79,9 +79,9 @@ impl Sprite {
     }
 }
 
-impl Renderable for Sprite {
-    fn render(&self, renderer: &mut Renderer, dest: Rectangle) {
-        renderer.copy(&mut self.tex.borrow_mut(), self.src.to_sdl(), dest.to_sdl())
+impl<'r> Renderable for Sprite<'r> {
+    fn render(&self, renderer: &mut WindowCanvas, dest: Rectangle) {
+        renderer.copy(&mut self.tex.borrow_mut(), self.src.to_sdl(), dest.to_sdl()).unwrap();
     }
 }
 
@@ -97,9 +97,9 @@ pub struct AnimatedSpriteDescr<'a> {
 }
 
 #[derive(Clone)]
-pub struct AnimatedSprite {
+pub struct AnimatedSprite<'r> {
     /// The frames that will be rendered, in order.
-    sprites: Rc<Vec<Sprite>>,
+    sprites: Rc<Vec<Sprite<'r>>>,
 
     /// The time it takes to get from one frame to the next, in seconds.
     frame_delay: f64,
@@ -109,9 +109,9 @@ pub struct AnimatedSprite {
     current_time: f64,
 }
 
-impl AnimatedSprite {
+impl<'r> AnimatedSprite<'r> {
     /// Creates a new animated sprite initialized at time 0.
-    pub fn new(sprites: Vec<Sprite>, frame_delay: f64) -> AnimatedSprite {
+    pub fn new(sprites: Vec<Sprite<'r>>, frame_delay: f64) -> AnimatedSprite {
         AnimatedSprite {
             sprites: Rc::new(sprites),
             frame_delay: frame_delay,
@@ -129,7 +129,7 @@ impl AnimatedSprite {
         AnimatedSprite::new(sprites, 1.0 / fps)
     }
     
-    pub fn load_frames(phi: &mut Phi, descr: AnimatedSpriteDescr) -> Vec<Sprite> {
+    pub fn load_frames(phi: &mut Phi, descr: AnimatedSpriteDescr) -> Vec<Sprite<'r>> {
         // Read the asteroid's image from the filesystem and construct an
         // animated sprite out of it.
 
@@ -189,9 +189,9 @@ impl AnimatedSprite {
     }
 }
 
-impl Renderable for AnimatedSprite {
+impl<'r> Renderable for AnimatedSprite<'r> {
     /// Renders the current frame of the sprite.
-    fn render(&self, renderer: &mut Renderer, dest: Rectangle) {
+    fn render(&self, renderer: &mut WindowCanvas, dest: Rectangle) {
         let current_frame =
             (self.current_time / self.frame_delay) as usize % self.frames();
 

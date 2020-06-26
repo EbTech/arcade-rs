@@ -2,10 +2,12 @@
 name = "arcade-rs"
 version = "0.1.0"
 authors = ["aram"]
+edition = "2018"
 
 [dependencies]
-sdl2 = "0.18.0"
-sdl2_image = "0.18.0"
-sdl2_mixer = "0.17.0"
-sdl2_ttf = "0.16.2"
-rand = "0.3.14"
+rand = "0.7.3"
+
+[dependencies.sdl2]
+version = "0.34.1"
+default-features = false
+features = ["ttf","image","gfx","mixer"]

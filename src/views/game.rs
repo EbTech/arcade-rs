@@ -1,10 +1,10 @@
-use phi::{Phi, View, ViewAction};
-use phi::data::{MaybeAlive, Rectangle};
-use phi::gfx::{AnimatedSprite, AnimatedSpriteDescr, CopySprite, Sprite};
+use crate::phi::{Phi, View, ViewAction};
+use crate::phi::data::{MaybeAlive, Rectangle};
+use crate::phi::gfx::{AnimatedSprite, AnimatedSpriteDescr, CopySprite, Sprite};
+use crate::views::shared::BgSet;
+use crate::views::bullets::*;
 use sdl2::pixels::Color;
-use views::shared::BgSet;
-use views::bullets::*;
-use sdl2_mixer::{Chunk, Music};
+use sdl2::mixer::{Chunk, Music};
 use std::path::Path;
 
 const DEBUG: bool = false;
@@ -43,15 +43,15 @@ enum PlayerFrame {
     DownSlow = 8
 }
 
-struct Player {
+struct Player<'r> {
     rect: Rectangle,
-    sprites: Vec<Sprite>,
+    sprites: Vec<Sprite<'r>>,
     current: PlayerFrame,
     cannon: CannonType,
 }
 
-impl Player {
-    pub fn new(phi: &mut Phi) -> Player {
+impl<'r> Player<'r> {
+    pub fn new(phi: &mut Phi) -> Player<'r> {
         // Get the spaceship's sprites
         let spritesheet = Sprite::load(&mut phi.renderer, PLAYER_PATH).unwrap();
         let mut sprites = Vec::with_capacity(9);
@@ -170,7 +170,7 @@ impl Player {
             self.rect);
     }
     
-    pub fn spawn_bullets(&self) -> Vec<Box<Bullet>> {
+    pub fn spawn_bullets(&self) -> Vec<Box<dyn Bullet>> {
         let cannons_x = self.rect.x + 30.0;
         let cannon1_y = self.rect.y + 6.0;
         let cannon2_y = self.rect.y + PLAYER_H - 10.0;
@@ -179,14 +179,14 @@ impl Player {
     }
 }
 
-struct Asteroid {
-    sprite: AnimatedSprite,
+struct Asteroid<'r> {
+    sprite: AnimatedSprite<'r>,
     rect: Rectangle,
     vel: f64,
 }
 
-impl Asteroid {
-    fn factory(phi: &mut Phi) -> AsteroidFactory {
+impl<'r> Asteroid<'r> {
+    fn factory(phi: &mut Phi) -> AsteroidFactory<'r> {
         AsteroidFactory {
             sprite: AnimatedSprite::with_fps(
                 AnimatedSprite::load_frames(phi, AnimatedSpriteDescr {
@@ -200,7 +200,7 @@ impl Asteroid {
         }
     }
     
-    fn update(mut self, phi: &mut Phi, dt: f64) -> Option<Asteroid> {
+    fn update(mut self, phi: &mut Phi, dt: f64) -> Option<Asteroid<'r>> {
         self.rect.x -= dt * self.vel;
         self.sprite.add_time(dt);
 
@@ -226,12 +226,12 @@ impl Asteroid {
     }
 }
 
-struct AsteroidFactory {
-    sprite: AnimatedSprite,
+struct AsteroidFactory<'r> {
+    sprite: AnimatedSprite<'r>,
 }
 
-impl AsteroidFactory {
-    fn random(&self, phi: &mut Phi) -> Asteroid {
+impl<'r> AsteroidFactory<'r> {
+    fn random(&self, phi: &mut Phi) -> Asteroid<'r> {
         let (w, h) = phi.output_size();
 
         // FPS in [10.0, 30.0)
@@ -247,17 +247,17 @@ impl AsteroidFactory {
                 w: ASTEROID_SIDE,
                 h: ASTEROID_SIDE,
                 x: w,
-                y: ::rand::random::<f64>().abs() * (h - ASTEROID_SIDE),
+                y: rand::random::<f64>().abs() * (h - ASTEROID_SIDE),
             },
 
             // vel in [50.0, 150.0)
-            vel: ::rand::random::<f64>().abs() * 100.0 + 50.0,
+            vel: rand::random::<f64>().abs() * 100.0 + 50.0,
         }
     }
 }
 
-struct Explosion {
-    sprite: AnimatedSprite,
+struct Explosion<'r> {
+    sprite: AnimatedSprite<'r>,
     rect: Rectangle,
 
     //? Keep how long its been arrived, so that we destroy the explosion once
@@ -265,8 +265,8 @@ struct Explosion {
     alive_since: f64,
 }
 
-impl Explosion {
-    fn factory(phi: &mut Phi) -> ExplosionFactory {
+impl<'r> Explosion<'r> {
+    fn factory(phi: &mut Phi) -> ExplosionFactory<'r> {
         ExplosionFactory {
             sprite: AnimatedSprite::with_fps(
                 AnimatedSprite::load_frames(phi, AnimatedSpriteDescr {
@@ -280,7 +280,7 @@ impl Explosion {
         }
     }
     
-    fn update(mut self, dt: f64) -> Option<Explosion> {
+    fn update(mut self, dt: f64) -> Option<Explosion<'r>> {
         self.alive_since += dt;
         self.sprite.add_time(dt);
 
@@ -297,12 +297,12 @@ impl Explosion {
 }
 
 
-struct ExplosionFactory {
-    sprite: AnimatedSprite,
+struct ExplosionFactory<'r> {
+    sprite: AnimatedSprite<'r>,
 }
 
-impl ExplosionFactory {
-    fn at_center(&self, center: (f64, f64)) -> Explosion {
+impl<'r> ExplosionFactory<'r> {
+    fn at_center(&self, center: (f64, f64)) -> Explosion<'r> {
         let mut sprite = self.sprite.clone();
 
         Explosion {
@@ -318,26 +318,26 @@ impl ExplosionFactory {
     }
 }
 
-pub struct GameView {
-    player: Player,
-    bullets: Vec<Box<Bullet>>,
-    asteroids: Vec<Asteroid>,
-    asteroid_factory: AsteroidFactory,
-    explosions: Vec<Explosion>,
-    explosion_factory: ExplosionFactory,
-    bg: BgSet,
-    music: Music,
+pub struct GameView<'a> {
+    player: Player<'a>,
+    bullets: Vec<Box<dyn Bullet>>,
+    asteroids: Vec<Asteroid<'a>>,
+    asteroid_factory: AsteroidFactory<'a>,
+    explosions: Vec<Explosion<'a>>,
+    explosion_factory: ExplosionFactory<'a>,
+    bg: BgSet<'a>,
+    music: Music<'a>,
     bullet_sound: Chunk,
     explosion_sound: Chunk,
 }
 
-impl GameView {
+impl<'a> GameView<'a> {
     /*pub fn new(phi: &mut Phi) -> GameView {
         let bg = BgSet::new(&mut phi.renderer);
         GameView::with_backgrounds(phi, bg)
     }*/
     
-    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> GameView {
+    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> GameView<'a> {
         let music =
             Music::from_file(Path::new("assets/mdk_phoenix_orchestral.ogg"))
             .unwrap();
@@ -373,7 +373,7 @@ impl GameView {
     }
 }
 
-impl View for GameView {
+impl<'a> View for GameView<'a> {
     fn update(mut self: Box<Self>, phi: &mut Phi, elapsed: f64) -> ViewAction {
         if phi.events.now.quit {
             return ViewAction::Quit;
@@ -382,10 +382,10 @@ impl View for GameView {
         if phi.events.now.key_escape == Some(true) {
             let bg = self.bg.clone();
             return ViewAction::Render(Box::new(
-                ::views::main_menu::MainMenuView::with_backgrounds(phi, bg)))
+                crate::views::main_menu::MainMenuView::with_backgrounds(phi, bg)))
             // TODO PauseView
             //return ViewAction::Render(Box::new(
-            //    ::views::main_menu::MainMenuView::with_game_state(self)));
+            //    crate::views::main_menu::MainMenuView::with_game_state(self)));
         }
         
         { // begin reference scope
@@ -397,7 +397,7 @@ impl View for GameView {
         
         // Update the bullets
         game.bullets =
-            ::std::mem::replace(&mut game.bullets, vec![])
+            std::mem::replace(&mut game.bullets, vec![])
             .into_iter()
             .filter_map(|bullet| bullet.update(phi, elapsed))
             .collect();
@@ -405,14 +405,14 @@ impl View for GameView {
         
         // Update the asteroids
         game.asteroids =
-            ::std::mem::replace(&mut game.asteroids, vec![])
+            std::mem::replace(&mut game.asteroids, vec![])
             .into_iter()
             .filter_map(|asteroid| asteroid.update(phi, elapsed))
             .collect();
         
         // Update the explosions
         game.explosions =
-            ::std::mem::replace(&mut game.explosions, vec![])
+            std::mem::replace(&mut game.explosions, vec![])
             .into_iter()
             .filter_map(|explosion| explosion.update(elapsed))
             .collect();
@@ -422,13 +422,13 @@ impl View for GameView {
         let mut player_alive = true;
         
         let mut transition_bullets: Vec<_> =
-            ::std::mem::replace(&mut game.bullets, vec![])
+            std::mem::replace(&mut game.bullets, vec![])
             .into_iter()
             .map(|bullet| MaybeAlive { alive: true, value: bullet })
             .collect();
         
         game.asteroids =
-            ::std::mem::replace(&mut game.asteroids, vec![])
+            std::mem::replace(&mut game.asteroids, vec![])
             .into_iter()
             .filter_map(|asteroid| {
                 // By default, the asteroid has not been in a collision.
@@ -484,7 +484,7 @@ impl View for GameView {
         
         // Randomly create an asteroid about once every 100 frames, that is,
         // a bit more often than once every two seconds.
-        if ::rand::random::<usize>() % 100 == 0 {
+        if rand::random::<usize>() % 100 == 0 {
             game.asteroids.push(game.asteroid_factory.random(phi));
         }
         

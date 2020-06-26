@@ -1,21 +1,21 @@
-use phi::{Phi, View, ViewAction};
-use phi::data::Rectangle;
-use phi::gfx::{CopySprite, Sprite};
+use crate::phi::{Phi, View, ViewAction};
+use crate::phi::data::Rectangle;
+use crate::phi::gfx::{CopySprite, Sprite};
+use crate::views::shared::BgSet;
 use sdl2::pixels::Color;
-use views::shared::BgSet;
 
 
 const ACTION_FONT: &'static str = "assets/belligerent.ttf";
 
-struct Action {
-    func: Box<Fn(&mut Phi, BgSet) -> ViewAction>,
+struct Action<'r> {
+    func: Box<dyn Fn(&mut Phi, BgSet) -> ViewAction>,
 
-    idle_sprite: Sprite,
-    hover_sprite: Sprite,
+    idle_sprite: Sprite<'r>,
+    hover_sprite: Sprite<'r>,
 }
 
-impl Action {
-    fn new(phi: &mut Phi, label: &'static str, func: Box<Fn(&mut Phi, BgSet) -> ViewAction>) -> Action {
+impl<'r> Action<'r> {
+    fn new(phi: &mut Phi, label: &'static str, func: Box<dyn Fn(&mut Phi, BgSet) -> ViewAction>) -> Action<'r> {
         Action {
             func: func,
             idle_sprite: phi.ttf_str_sprite(label, ACTION_FONT, 32, Color::RGB(220, 220, 220)).unwrap(),
@@ -24,24 +24,24 @@ impl Action {
     }
 }
 
-pub struct MainMenuView {
-    actions: Vec<Action>,
+pub struct MainMenuView<'r> {
+    actions: Vec<Action<'r>>,
     selected: i8,
-    bg: BgSet,
+    bg: BgSet<'r>,
 }
 
-impl MainMenuView {
-    pub fn new(phi: &mut Phi) -> MainMenuView {
+impl<'r> MainMenuView<'r> {
+    pub fn new(phi: &mut Phi) -> MainMenuView<'r> {
         let bg = BgSet::new(&mut phi.renderer);
         MainMenuView::with_backgrounds(phi, bg)
     }
     
-    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> MainMenuView {
+    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet<'r>) -> MainMenuView<'r> {
         MainMenuView {
             actions: vec![
                 Action::new(phi, "New Game", Box::new(|phi, bg| {
                     ViewAction::Render(Box::new(
-                        ::views::game::GameView::with_backgrounds(phi, bg)))
+                        crate::views::game::GameView::with_backgrounds(phi, bg)))
                 })),
                 Action::new(phi, "Quit", Box::new(|_, _| {
                     ViewAction::Quit
@@ -53,7 +53,7 @@ impl MainMenuView {
     }
 }
 
-impl View for MainMenuView {
+impl<'r> View for MainMenuView<'r> {
     fn update(mut self : Box<Self>, phi: &mut Phi, elapsed: f64) -> ViewAction {
         if phi.events.now.quit || phi.events.now.key_escape == Some(true) {
             return ViewAction::Quit;
